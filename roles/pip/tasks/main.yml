@@ -1,0 +1,39 @@
+---
+- name: Check if EPEL repo is already configured.
+  stat: path={{ epel_repofile_path }}
+  register: epel_repofile_result
+
+- name: Install EPEL repo.
+  yum:
+    name: "{{ epel_repo_url }}"
+    state: present
+  register: result
+  until: '"failed" not in result'
+  retries: 5
+  delay: 10
+  when: not epel_repofile_result.stat.exists
+
+- name: Import EPEL GPG key.
+  rpm_key:
+    key: "{{ epel_repo_gpg_key_url }}"
+    state: present
+  when: not epel_repofile_result.stat.exists
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Check to see if pip is already installed.
+  command: "{{ pip }} --version"
+  ignore_errors: true
+  changed_when: false # read-only task
+  check_mode: no
+  register: pip_is_installed
+
+- name: install python pip
+  yum:
+    name: python-pip
+    state: present
+
+#by default pip version in redhat 6.9 is 6, upgrade to 9
+- name: upgrade pip
+  pip:
+    name: pip
+    extra_args: --upgrade
